@@ -4,6 +4,7 @@
 import os
 import sys
 import json
+import tarfile
 import paramiko
 from getpass import getpass
 from datetime import datetime
@@ -73,7 +74,7 @@ class Client(Configreader):
             print('Sftp session closed')
         if self.transport:
             self.transport.close()
-            print('Transport closed')        
+            print('Transport closed')
     
     def listdir(self, path):
         if self.sftp:
@@ -82,21 +83,35 @@ class Client(Configreader):
         else:
             print("Not connected!")
     
-    def backup(self, files):
-        backupfile = self.localbackupdir+self.backupfile
-        with tarfile.open(backupfile, "w:gz") as tar:
-            for folder in self.backupfolders:
-                print("Adding folder", folder)
-                tar.add(folder)
-            print("Backup created")
+    def backup(self, backupfile=None):
+        if not backupfile:
+            backupfile = self.localbackupdir+self.backupfile
+        try:
+            if os.path.exists(backupfile):
+                os.remove(backupfile)
+            with tarfile.open(backupfile, "w:gz") as tar:
+                for folder in self.backupfolders:
+                    f = self.localbackupdir+folder
+                    print("Adding folder", f)
+                    tar.add(f)
+                print("Backup created")
+        except Exception as e:
+            self.disconnect()
+            sys.exit(e.args)
     
     def sendtoserver(self):
         if self.sftp:
-            localpath = self.localbackupdir+self.backupfile
-            remotepath = self.remotebackupdir+self.backupfile
-            self.sftp.put(localpath, remotepath)
-            print("Backup sent") 
-
+            try:
+                localpath = self.localbackupdir+self.backupfile
+                remotepath = self.remotebackupdir+self.backupfile
+                print("moving file", localpath)
+                print("to location", remotepath)
+                self.sftp.put(localpath, remotepath)
+                print("Backup sent") 
+            except Exception as e:
+                self.disconnect()
+                sys.exit(e.args)
+                
     def retrieve(self, backup):
         pass
 
