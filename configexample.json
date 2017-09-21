@@ -1,0 +1,6 @@
+{
+    "username": "",
+    "hostname": "",
+    "port": 22,
+    "keypath": "/path/to/private/key"
+}
