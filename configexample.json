@@ -1,0 +1,14 @@
+{
+    "username": "",
+    "hostname": "",
+    "port": 22,
+    "keypath": "/path/to/private/key",
+    "localbackupdir": "/home/localuser/",
+    "backupfolders": [
+        "Asiakirjat",
+        "Testi",
+        "Lataukset"
+    ],
+    "remotebackupdir": "backups/",
+    "backupfile": "backup.tar.gz"
+}
