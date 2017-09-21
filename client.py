@@ -89,6 +89,8 @@ class Client(Configreader):
         try:
             if os.path.exists(backupfile):
                 os.remove(backupfile)
+                print("removed old local backup",backupfile)
+            print("Creating backup", backupfile)
             with tarfile.open(backupfile, "w:gz") as tar:
                 for folder in self.backupfolders:
                     f = self.localbackupdir+folder
@@ -112,14 +114,27 @@ class Client(Configreader):
                 self.disconnect()
                 sys.exit(e.args)
                 
+    def getlastbackup(self, remotepath=None):
+        if not remotepath:
+            remotepath = self.remotebackupdir+self.backupfile
+        if self.sftp:
+            try:
+                data = self.sftp.lstat(remotepath)
+                date = datetime.fromtimestamp(data.st_mtime)
+                print("Last backup was taken at", date.strftime('%Y-%m-%d %H:%M:%S'))
+            except Exception as e:
+                self.disconnect()
+                sys.exit(e.args)
+                    
     def retrieve(self, backup):
         pass
 
 
 def main():
     client = Client('config.json')
-    client.backup()
     client.connect()
+    client.getlastbackup()
+    client.backup()
     client.sendtoserver()
     client.disconnect()
 
