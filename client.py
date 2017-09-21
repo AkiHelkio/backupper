@@ -18,9 +18,9 @@ class Log:
         if (eventtype):
             self.eventtype = eventtype
         row = {
-            "time" = datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "type" = self.eventtype,
-            "text" = text
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "type": self.eventtype,
+            "text": text
         }
         print(self.textformat.format(**row))
 
@@ -55,21 +55,33 @@ class Client(Configreader):
     def connect(self):
         try:
             # get key
+            print ("trying to convert ", self.keypath)
             key = paramiko.RSAKey.from_private_key_file(self.keypath)
             # make connection
-            self.transport = paramiko.Transport((self.host, self.port))
+            self.transport = paramiko.Transport((self.hostname, self.port))
             self.transport.connect(username=self.username, pkey=key)
-            print("Connected to", self.host, "as", self.username)
+            print("Connected to", self.hostname, "as", self.username)
+            self.sftp = paramiko.SFTPClient.from_transport(self.transport)
+            print("Started sftp session")
         except Exception as e:
+            self.disconnect()
             sys.exit(e.args)
-            
 
     def disconnect(self):
-        self.sftp.close()
-        self.log.event('Sftp session closed')
-        self.transport.close()
-        self.log.event('Transport closed')
-        
+        if self.sftp:
+            self.sftp.close()
+            print('Sftp session closed')
+        if self.transport:
+            self.transport.close()
+            print('Transport closed')        
+    
+    def listdir(self, path):
+        if self.sftp:
+            for f in self.sftp.listdir():
+                print("Found:", f)
+        else:
+            print("Not connected!")
+    
     def backup(self, files):
         pass
 
@@ -79,7 +91,9 @@ class Client(Configreader):
 
 def main():
     client = Client('config.json')
-    client.
+    client.connect()
+    client.listdir('.')
+    client.disconnect()
 
 
 if __name__ == '__main__':
