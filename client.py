@@ -83,7 +83,19 @@ class Client(Configreader):
             print("Not connected!")
     
     def backup(self, files):
-        pass
+        backupfile = self.localbackupdir+self.backupfile
+        with tarfile.open(backupfile, "w:gz") as tar:
+            for folder in self.backupfolders:
+                print("Adding folder", folder)
+                tar.add(folder)
+            print("Backup created")
+    
+    def sendtoserver(self):
+        if self.sftp:
+            localpath = self.localbackupdir+self.backupfile
+            remotepath = self.remotebackupdir+self.backupfile
+            self.sftp.put(localpath, remotepath)
+            print("Backup sent") 
 
     def retrieve(self, backup):
         pass
@@ -91,8 +103,9 @@ class Client(Configreader):
 
 def main():
     client = Client('config.json')
+    client.backup()
     client.connect()
-    client.listdir('.')
+    client.sendtoserver()
     client.disconnect()
 
 
