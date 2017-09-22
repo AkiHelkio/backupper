@@ -10,22 +10,6 @@ from getpass import getpass
 from datetime import datetime
 
 
-class Log:
-    def __init__(self):
-        self.textformat = "[{time}][{type}] {text}"
-        self.eventtype = "info"
-        
-    def event(self, text, eventtype=None):
-        if (eventtype):
-            self.eventtype = eventtype
-        row = {
-            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "type": self.eventtype,
-            "text": text
-        }
-        print(self.textformat.format(**row))
-
-
 # basic json to dict to attributes reader
 class Configreader:
     def __init__(self, configpath):
@@ -39,7 +23,14 @@ class Configreader:
                 self.config = json.load(f)
             # convert dict to attributes
             for k,v in self.config.items():
-                setattr(self, k, v)
+                if type(v) is dict:
+                    for subkey,subvalue in v.items():
+                        print("Setting sub:", subkey)
+                        setattr(self, subkey, subvalue)
+                else:
+                    print("Setting",k)
+                    setattr(self, k, v)
+                    
         except FileNotFoundException:
             print("Unable to find", self.configpath)
             sys.exit(1)
@@ -100,6 +91,12 @@ class Client(Configreader):
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
+            
+    def cleanLocaldir(self):
+        for f in os.listdir(self.localdir):
+            temp = os.path.join(self.localdir, f)
+            print("removing", temp)
+            os.remove(temp)
     
     def sendtoserver(self):
         if self.sftp:
@@ -132,12 +129,15 @@ class Client(Configreader):
 
 def main():
     client = Client('config.json')
+    client.cleanLocaldir()
+    """
     client.connect()
-    client.getlastbackup()
-    client.backup()
+    client.cleanRemoteBackups()
+    client.backupfolders()
     client.sendtoserver()
     client.disconnect()
-
+    """
+    
 
 if __name__ == '__main__':
     main()
