@@ -8,6 +8,7 @@ import tarfile
 import paramiko
 from getpass import getpass
 from datetime import datetime
+from operator import itemgetter, attrgetter
 
 
 # basic json to dict to attributes reader
@@ -23,12 +24,13 @@ class Configreader:
                 self.config = json.load(f)
             # convert dict to attributes
             for k,v in self.config.items():
+                # convert all but foldernames to primary names:
                 if type(v) is dict:
                     for subkey,subvalue in v.items():
-                        print("Setting sub:", subkey)
+                        # print("Setting sub:", subkey)
                         setattr(self, subkey, subvalue)
                 else:
-                    print("Setting",k)
+                    # print("Setting",k)
                     setattr(self, k, v)
                     
         except FileNotFoundException:
@@ -36,7 +38,7 @@ class Configreader:
             sys.exit(1)
 
 
-# client extends Configreader
+# client extends Configreader and handles connections
 class Client(Configreader):
     def __init__(self, configpath):
         super().__init__(configpath)
@@ -66,59 +68,101 @@ class Client(Configreader):
         if self.transport:
             self.transport.close()
             print('Transport closed')
+
+
+# backupper as its own class
+class Backupper(Client):
+    def __init__(self, configpath):
+        super().__init__(configpath)
     
-    def listdir(self, path):
+    def test(self):
+        files = self.listdir('backups')
+        times = self.listmtimes(files)
+        listing = sorted(self.asDatetime(times), key=lambda row: row['time'])
+        for l in listing:
+            print(str(l['time'])+"\t"+l['path'])
+                
+    def listdir(self, path='.'):
+        print("Listing remotedir",path)
         if self.sftp:
-            for f in self.sftp.listdir():
-                print("Found:", f)
+            for f in self.sftp.listdir(path):
+                yield os.path.join(path, f)
         else:
             print("Not connected!")
+            
+    def listmtimes(self, files):
+        if self.sftp:
+            for f in files:
+                yield { "path": f, "time": self.sftp.stat(f).st_mtime }
     
-    def backup(self, backupfile=None):
-        if not backupfile:
-            backupfile = self.localbackupdir+self.backupfile
+    def asDatetime(self, mtimes, toString=False):
+        for m in mtimes:
+            d = datetime.fromtimestamp(m['time'])
+            if toString:
+                yield { "path": m['path'], "time": d.strftime('%Y-%m-%d %H:%M:%S') }
+            else:
+                yield { "path": m['path'], "time": d }
+        
+    def cleanWorkdir(self):
+        for f in os.listdir(self.workdir):
+            temp = os.path.join(self.workdir, f)
+            print("removing", temp)
+            os.remove(temp)
+    
+    def backup(self):
+        # generate filename from config and timestamp
+        self.backupfilename = (
+            self.filetag + "_" +
+            datetime.now().strftime(self.timeformat) +
+            ".tar.gz")
+        # loop configured folders
         try:
-            if os.path.exists(backupfile):
-                os.remove(backupfile)
-                print("removed old local backup",backupfile)
-            print("Creating backup", backupfile)
-            with tarfile.open(backupfile, "w:gz") as tar:
-                for folder in self.backupfolders:
-                    f = self.localbackupdir+folder
-                    print("Adding folder", f)
-                    tar.add(f)
+            tarpath = os.path.join(self.workdir, self.backupfilename)
+            with tarfile.open(tarpath, "w:gz") as tar:
+                for f in os.listdir(self.foldernames):
+                    tar.add(os.path.join(self.homedir, f))
                 print("Backup created")
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
-            
-    def cleanLocaldir(self):
-        for f in os.listdir(self.localdir):
-            temp = os.path.join(self.localdir, f)
-            print("removing", temp)
-            os.remove(temp)
     
-    def sendtoserver(self):
-        if self.sftp:
+    def convertMtime(self, mtime, toString=False):
+        d = datetime.fromtimestamp(
+            self.sftp.lstat(remotepath).st_mtime
+        )
+        if toString:
+            d = d.strftime('%Y-%m-%d %H:%M:%S')
+        return d
+                
+    def checkBackups(self, clean=False):
+        # get all backups, sort by st_mtime
+        # remotepath = os.path.join(self.remotedir, self.backupfilename)
+        if not self.sftp:
+            self.disconnect()
+            sys.exit(1)
+        with self.sftp as s:
             try:
-                localpath = self.localbackupdir+self.backupfile
-                remotepath = self.remotebackupdir+self.backupfile
-                print("moving file", localpath)
-                print("to location", remotepath)
-                self.sftp.put(localpath, remotepath)
-                print("Backup sent") 
+                ajat = sorted([
+                    s.stat(path).st_mtime for path in [
+                    os.path.join(self.remotedir, f) for f in s.listdir(self.remotedir)
+                    ]
+                ])
+                datet = [convertMtime(a) for a in ajat]
+                print("Oldest backup:",datet[-1])
+                print("Newest backup:",datet[0])
+                    
             except Exception as e:
                 self.disconnect()
                 sys.exit(e.args)
-                
-    def getlastbackup(self, remotepath=None):
-        if not remotepath:
-            remotepath = self.remotebackupdir+self.backupfile
+        return date
+        
+    def sendtoserver(self):
+        localpath = os.path.join(self.workdir, self.backupfilename)
+        remotepath = os.path.join(self.remotedir, self.backupfilename)
         if self.sftp:
             try:
-                data = self.sftp.lstat(remotepath)
-                date = datetime.fromtimestamp(data.st_mtime)
-                print("Last backup was taken at", date.strftime('%Y-%m-%d %H:%M:%S'))
+                self.sftp.put(localpath, remotepath)
+                print("Backup sent") 
             except Exception as e:
                 self.disconnect()
                 sys.exit(e.args)
@@ -128,11 +172,14 @@ class Client(Configreader):
 
 
 def main():
-    client = Client('config.json')
-    client.cleanLocaldir()
+    b = Backupper('config.json')
+    # b.cleanWorkdir()
+    # b.backup()
+    b.connect()
+    b.test()
+    b.disconnect()
     """
-    client.connect()
-    client.cleanRemoteBackups()
+    client.checkBackups()
     client.backupfolders()
     client.sendtoserver()
     client.disconnect()
