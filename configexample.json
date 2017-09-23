@@ -1,14 +1,23 @@
 {
-    "username": "",
-    "hostname": "",
-    "port": 22,
-    "keypath": "/path/to/private/key",
-    "localbackupdir": "/home/localuser/",
-    "backupfolders": [
+    "credentials": {
+        "username": "",
+        "hostname": "",
+        "port": 22,
+        "keypath": "/home/backupuser/.ssh/id_rsa"
+    },
+    "backupconfig": {
+        "workdir": "/home/backupuser/backups/",
+        "homedir": "/home/backupuser/",
+        "remotedir": "backups/",
+        "filetag": "backupuser",
+        "timeformat": "%Y-%m-%d_%H%M%S"
+    },
+    "backupcycle": {
+        "daystokeep": 30
+    },
+    "foldernames": [
         "Asiakirjat",
         "Testi",
         "Lataukset"
-    ],
-    "remotebackupdir": "backups/",
-    "backupfile": "backup.tar.gz"
+    ]
 }
