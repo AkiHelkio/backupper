@@ -17,6 +17,7 @@ class Configreader:
         self.configpath = configpath
         self.config = None
         self.load()
+        self.configcheck()
         
     def load(self):
         try:
@@ -32,9 +33,36 @@ class Configreader:
                 else:
                     logging.debug("Setting main: "+str(k))
                     setattr(self, k, v)
-        except FileNotFoundException:
+        except FileNotFoundError:
             logging.info("Unable to find "+str(self.configpath))
             sys.exit(1)
+    
+    def configcheck(self):
+        try:
+            status_ok = True
+            # add config paths to locations
+            locations = [
+                self.keypath,
+                self.workdir,
+                self.homedir
+            ]
+            for folder in self.foldernames:
+                locations.append(os.path.join(self.homedir, folder))
+            # Begin test:
+            for folder in locations:
+                ok = os.path.exists(folder)
+                if not ok:
+                    status_ok = False
+                    logging.warning("Config path missing: "+str(folder))
+                else:
+                    logging.debug("Checked path: "+str(folder))
+            # Stop if not ok:
+            if not status_ok:
+                logging.info("Check config file and run program again")
+                sys.exit(2)
+        except Exception as e:
+            logging.info("Check failed")
+            sys.exit(e.args)
 
 
 # client extends Configreader and handles connections
