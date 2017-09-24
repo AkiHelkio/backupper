@@ -3,22 +3,22 @@ A tool for taking full backups of specific folders within a linux homedirectory 
 the ability to send backups to centralized remote location.
 
 ## Todo
-[x] Create test keys and environment
-[x] Implement client sftp connection
-[x] create tar.gz backup functionality
-[x] Old backup cleanup by config
-[x] workdir cleanup
-[x] Sanity checking before sftp put
-[x] Improve logging
-[ ] Add automatic testing of config.json
-[ ] Create backup statistics history database
-[ ] Implement statistics append to database
-[ ] Create cron scheduling for backupper
-[ ] Implement cron process (create, start, stop, remove)
-[ ] Add install feature to build config.json from template
-[ ] Add GUI for config.json and scheduling cron
-[ ] Implement backup retrieval
-[ ] Implement backup restore process
+* [x] Create test keys and environment
+* [x] Implement client sftp connection
+* [x] create tar.gz backup functionality
+* [x] Old backup cleanup by config
+* [x] workdir cleanup
+* [x] Sanity checking before sftp put
+* [x] Improve logging
+* [ ] Add automatic testing of config.json
+* [ ] Create backup statistics history database
+* [ ] Implement statistics append to database
+* [ ] Create cron scheduling for backupper
+* [ ] Implement cron process (create, start, stop, remove)
+* [ ] Add install feature to build config.json from template
+* [ ] Add GUI for config.json and scheduling cron
+* [ ] Implement backup retrieval
+* [ ] Implement backup restore process
 
 
 ## Setup
