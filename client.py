@@ -79,7 +79,25 @@ class Client(Configreader):
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
-
+            
+    def getAvailableSpace(self, mountpoint):
+        try:
+            space = None
+            stdin, stdout, stderr = self.ssh.exec_command('df')
+            for data in stdout.readlines():
+                row = [a for a in data.strip().split(" ") if a != '']
+                if row[-1] == mountpoint:
+                    space = int(row[3])
+            if not space:
+                print("Unable to find space for mountpoint '",mountpoint,"'")
+            return space
+        except SSHException as e:
+            self.disconnect()
+            sys.exit(e.args)
+        except Exception as e:
+            self.disconnect()
+            sys.exit(e.args)
+        
     def disconnect(self):
         if self.ssh:
             self.ssh.close()
@@ -104,13 +122,20 @@ class Backupper(Client):
             try:
                 for f in self.getRemoteFiles():
                     if f['time'] < cycletime:
-                        #self.sftp.remove(f['path'])
+                        self.sftp.remove(f['path'])
                         print("Removed",f['path'])
+            except SSHException as e:
+                self.disconnect()
+                sys.exit(e.args)
             except Exception as e:
                 self.disconnect()
                 sys.exit(e.args)
                 
     # - - - generator collection - - -
+    # creates an array of dictionaries with time and path:
+    # format: [
+    # {"time": "2017-01-01 10:00:00", "path": "/location"}
+    # ]
     def getRemoteFiles(self, directory=None, show=False):
         if not directory:
             directory = self.remotedir
@@ -146,6 +171,7 @@ class Backupper(Client):
     # - - - generator collection end - - -
     
     def cleanWorkdir(self):
+        print("Cleaning",self.workdir)
         for f in os.listdir(self.workdir):
             temp = os.path.join(self.workdir, f)
             print("Removing", temp)
@@ -158,10 +184,10 @@ class Backupper(Client):
             datetime.now().strftime(self.timeformat) +
             ".tar.gz")
         print("Creating backup",self.backupfilename)
-        # loop configured folders
         try:
             tarpath = os.path.join(self.workdir, self.backupfilename)
             with tarfile.open(tarpath, "w:gz") as tar:
+                # loop configured folders and add to tarfile:
                 for f in self.foldernames:
                     targetpath = os.path.join(self.homedir, f)
                     print("Adding",targetpath)
@@ -172,10 +198,22 @@ class Backupper(Client):
             sys.exit(e.args)
             
     def canUpload(self):
+        upload = True
         print("Checking that the server has enough space")
-        self.runRemote('df -h')
-        # testing: functionality not implemented
-        return True
+        space = self.getAvailableSpace('/')
+        if not space:
+            upload = False
+        else:
+            print("Server has",int(space/1024),"MB available")
+            print("Backup size is ", end="")
+            fsize = int(os.stat(os.path.join(self.workdir, self.backupfilename)).st_size/1024)
+            print(str(int(fsize/1024))+" MB")
+            # ensure we have atleast one gigabyte at server :D 
+            if space - fsize > (1024*1024):
+                upload = True
+            else:
+                upload = False
+        return upload
         
     def sendtoServer(self):
         localpath = os.path.join(self.workdir, self.backupfilename)
@@ -188,7 +226,7 @@ class Backupper(Client):
             except Exception as e:
                 self.disconnect()
                 sys.exit(e.args)
-                    
+                
     def retrieve(self, backup):
         pass
 
