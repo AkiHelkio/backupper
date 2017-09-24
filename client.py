@@ -27,12 +27,11 @@ class Configreader:
                 # convert all but foldernames to primary names:
                 if type(v) is dict:
                     for subkey,subvalue in v.items():
-                        # logging.info("Setting sub: "+str(subkey))
+                        logging.debug("Setting  sub: "+str(subkey))
                         setattr(self, subkey, subvalue)
                 else:
-                    # logging.info("Setting "+str(k))
+                    logging.debug("Setting main: "+str(k))
                     setattr(self, k, v)
-                    
         except FileNotFoundException:
             logging.info("Unable to find "+str(self.configpath))
             sys.exit(1)
@@ -231,13 +230,13 @@ class Backupper(Client):
         pass
 
 
-def main():
+def main(config):
     logging.basicConfig(
         format='[%(asctime)s] %(message)s',
         level=logging.INFO,
         datefmt="%Y-%m-%d %H:%M:%S"
     )
-    b = Backupper('config.json')
+    b = Backupper(config)
     b.connect()
     b.cleanWorkdir()
     b.getRemoteFiles(show=True)
@@ -249,5 +248,9 @@ def main():
     
 
 if __name__ == '__main__':
-    main()
+    try:
+        conf = sys.argv[1]
+    except IndexError:
+        conf = 'config.json'
+    main(conf)
 
