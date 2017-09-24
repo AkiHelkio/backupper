@@ -43,27 +43,50 @@ class Client(Configreader):
         super().__init__(configpath)
         # paramiko variables
         self.transport = None
+        self.ssh = None
         self.sftp = None
-
+    
+    def createSSHclient(self):
+        # get key
+        key = paramiko.RSAKey.from_private_key_file(self.keypath)
+        # create client:
+        self.ssh = paramiko.SSHClient()
+        # for now, force accept
+        self.ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        # make connection
+        self.ssh.connect(
+            hostname=self.hostname,
+            port=self.port,
+            pkey=key
+        )
+        print("Connected to", self.hostname, "as", self.username)
+        
     def connect(self):
         try:
-            # get key
-            print ("trying to convert ", self.keypath)
-            key = paramiko.RSAKey.from_private_key_file(self.keypath)
-            # make connection
-            self.transport = paramiko.Transport((self.hostname, self.port))
-            self.transport.connect(username=self.username, pkey=key)
-            print("Connected to", self.hostname, "as", self.username)
-            self.sftp = paramiko.SFTPClient.from_transport(self.transport)
-            print("Started sftp session")
+            self.createSSHclient()
+            print("SSH session opened")
+            self.sftp = self.ssh.open_sftp()
+            print("SFTP session opened")
+        except Exception as e:
+            self.disconnect()
+            sys.exit(e.args)
+            
+    def runRemote(self, cmd):
+        try:
+            stdin, stdout, sterr = self.ssh.exec_command(cmd)
+            for data in stdout.readlines():
+                print(data, end="")
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
 
     def disconnect(self):
+        if self.ssh:
+            self.ssh.close()
+            print('SSH session closed')
         if self.sftp:
             self.sftp.close()
-            print('Sftp session closed')
+            print('SFTP session closed')
         if self.transport:
             self.transport.close()
             print('Transport closed')
@@ -125,7 +148,7 @@ class Backupper(Client):
     def cleanWorkdir(self):
         for f in os.listdir(self.workdir):
             temp = os.path.join(self.workdir, f)
-            print("removing", temp)
+            print("Removing", temp)
             os.remove(temp)
     
     def createBackup(self):
@@ -150,6 +173,7 @@ class Backupper(Client):
             
     def canUpload(self):
         print("Checking that the server has enough space")
+        self.runRemote('df -h')
         # testing: functionality not implemented
         return True
         
