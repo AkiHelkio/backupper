@@ -4,6 +4,7 @@
 import os
 import sys
 import json
+import logging
 import tarfile
 import paramiko
 from getpass import getpass
@@ -26,14 +27,14 @@ class Configreader:
                 # convert all but foldernames to primary names:
                 if type(v) is dict:
                     for subkey,subvalue in v.items():
-                        # print("Setting sub:", subkey)
+                        # logging.info("Setting sub: "+str(subkey))
                         setattr(self, subkey, subvalue)
                 else:
-                    # print("Setting",k)
+                    # logging.info("Setting "+str(k))
                     setattr(self, k, v)
                     
         except FileNotFoundException:
-            print("Unable to find", self.configpath)
+            logging.info("Unable to find "+str(self.configpath))
             sys.exit(1)
 
 
@@ -59,14 +60,14 @@ class Client(Configreader):
             port=self.port,
             pkey=key
         )
-        print("Connected to", self.hostname, "as", self.username)
+        logging.info("Connected to "+self.hostname+" as "+self.username)
         
     def connect(self):
         try:
             self.createSSHclient()
-            print("SSH session opened")
+            logging.info("SSH session opened")
             self.sftp = self.ssh.open_sftp()
-            print("SFTP session opened")
+            logging.info("SFTP session opened")
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
@@ -75,7 +76,7 @@ class Client(Configreader):
         try:
             stdin, stdout, sterr = self.ssh.exec_command(cmd)
             for data in stdout.readlines():
-                print(data, end="")
+                logging.info(data.replace("\n"))
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
@@ -89,7 +90,7 @@ class Client(Configreader):
                 if row[-1] == mountpoint:
                     space = int(row[3])
             if not space:
-                print("Unable to find space for mountpoint '",mountpoint,"'")
+                logging.info("Unable to find space for mountpoint '"+str(mountpoint)+"'")
             return space
         except SSHException as e:
             self.disconnect()
@@ -99,15 +100,15 @@ class Client(Configreader):
             sys.exit(e.args)
         
     def disconnect(self):
-        if self.ssh:
-            self.ssh.close()
-            print('SSH session closed')
         if self.sftp:
             self.sftp.close()
-            print('SFTP session closed')
+            logging.info('SFTP session closed')
+        if self.ssh:
+            self.ssh.close()
+            logging.info('SSH session closed')
         if self.transport:
             self.transport.close()
-            print('Transport closed')
+            logging.info('Transport closed')
 
 
 # backupper as its own class
@@ -117,13 +118,13 @@ class Backupper(Client):
     
     def removeOldFiles(self):
         cycletime = datetime.now() - timedelta(days=self.daystokeep)
-        print("Removing files older than",str(cycletime))
+        logging.info("Removing files older than "+str(cycletime))
         if self.sftp:
             try:
                 for f in self.getRemoteFiles():
                     if f['time'] < cycletime:
                         self.sftp.remove(f['path'])
-                        print("Removed",f['path'])
+                        logging.info("Removed "+f['path'])
             except SSHException as e:
                 self.disconnect()
                 sys.exit(e.args)
@@ -144,17 +145,17 @@ class Backupper(Client):
         filelist = self.asDatetime(times)
         for f in sorted(filelist, key=lambda row: row['time']):
             if show:
-                print(f['time'],"\t",f['path'])
+                logging.info(str(f['time'])+"\t"+f['path'])
             else:
                 yield f
             
     def listdir(self, path='.'):
-        print("Listing remotedir",path)
+        logging.info("Listing remotedir "+path)
         if self.sftp:
             for f in self.sftp.listdir(path):
                 yield os.path.join(path, f)
         else:
-            print("Not connected!")
+            logging.info("Not connected!")
             
     def listmtimes(self, files):
         if self.sftp:
@@ -171,10 +172,10 @@ class Backupper(Client):
     # - - - generator collection end - - -
     
     def cleanWorkdir(self):
-        print("Cleaning",self.workdir)
+        logging.info("Cleaning "+self.workdir)
         for f in os.listdir(self.workdir):
             temp = os.path.join(self.workdir, f)
-            print("Removing", temp)
+            logging.info("Removing "+temp)
             os.remove(temp)
     
     def createBackup(self):
@@ -183,31 +184,30 @@ class Backupper(Client):
             self.filetag + "_" +
             datetime.now().strftime(self.timeformat) +
             ".tar.gz")
-        print("Creating backup",self.backupfilename)
+        logging.info("Creating backup "+self.backupfilename)
         try:
             tarpath = os.path.join(self.workdir, self.backupfilename)
             with tarfile.open(tarpath, "w:gz") as tar:
                 # loop configured folders and add to tarfile:
                 for f in self.foldernames:
                     targetpath = os.path.join(self.homedir, f)
-                    print("Adding",targetpath)
+                    logging.info("Adding "+targetpath)
                     tar.add(targetpath)
-                print("Backup created")
+                logging.info("Backup created")
         except Exception as e:
             self.disconnect()
             sys.exit(e.args)
             
     def canUpload(self):
         upload = True
-        print("Checking that the server has enough space")
+        logging.info("Checking that the server has enough space")
         space = self.getAvailableSpace('/')
         if not space:
             upload = False
         else:
-            print("Server has",int(space/1024),"MB available")
-            print("Backup size is ", end="")
+            logging.info("Server has "+str(int(space/1024))+" MB available")
             fsize = int(os.stat(os.path.join(self.workdir, self.backupfilename)).st_size/1024)
-            print(str(int(fsize/1024))+" MB")
+            logging.info("Backup size is "+str(int(fsize/1024))+" MB")
             # ensure we have atleast one gigabyte at server :D 
             if space - fsize > (1024*1024):
                 upload = True
@@ -220,9 +220,9 @@ class Backupper(Client):
         remotepath = os.path.join(self.remotedir, self.backupfilename)
         if self.sftp:
             try:
-                print("Sending",localpath,"...")
+                logging.info("Sending " + localpath + "...")
                 self.sftp.put(localpath, remotepath)
-                print("Backup sent to",remotepath) 
+                logging.info("Backup sent to " + remotepath) 
             except Exception as e:
                 self.disconnect()
                 sys.exit(e.args)
@@ -232,6 +232,11 @@ class Backupper(Client):
 
 
 def main():
+    logging.basicConfig(
+        format='[%(asctime)s] %(message)s',
+        level=logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
     b = Backupper('config.json')
     b.connect()
     b.cleanWorkdir()

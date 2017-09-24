@@ -1,0 +1,19 @@
+{
+    "credentials": {
+        "username": "",
+        "hostname": "",
+        "port": 22,
+        "keypath": ""
+    },
+    "backupconfig": {
+        "workdir": "",
+        "homedir": "",
+        "remotedir": "backups/",
+        "filetag": "",
+        "timeformat": "%Y-%m-%d_%H%M%S"
+    },
+    "backupcycle": {
+        "daystokeep": 30
+    },
+    "foldernames": []
+}
