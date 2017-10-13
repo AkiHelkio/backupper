@@ -1,6 +1,6 @@
 # backupper
 A tool for taking full backups of specific folders within a linux homedirectory with
-the ability to send backups to centralized remote location.
+the ability to send backups to a centralized remote location.
 
 ## Todo
 * [x] Create test keys and environment
@@ -10,7 +10,6 @@ the ability to send backups to centralized remote location.
 * [x] workdir cleanup
 * [x] Sanity checking before sftp put
 * [x] Improve logging
-* [ ] Add automatic testing of config.json
 * [ ] Create backup statistics history database
 * [ ] Implement statistics append to database
 * [ ] Create cron scheduling for backupper
